@@ -8,13 +8,12 @@ common:
   rank: 0
   world_size: 1
   distributed: false
-  save_dir: ./cola
+  save_dir: ./squad
   n_epochs: 20
   
 dataset:
-  name: cola
-  type: 
-  num_classes: 2
+  name: squad
+  type: generation
   batch_size: 16
   max_seq_length: 200
   pad_to_max_length: true
@@ -33,7 +32,6 @@ lr_scheduler:
   warmup_ratio: 0.1
 
 model:
-  name: roberta-base
-  hidden_size: 768
-  dropout: 0.1
-  attention_dropout: 0.1
+  name: openai-gpt
+  n_embs: 768
+  vocab_size: 50257

@@ -35,6 +35,7 @@ class SingleTaskClassificationModel(nn.Module):
             'attention': outputs.attentions,
         })
 
+#TO DO: make a multi-task fine-tuning model
 class MultiTaskClassificationModel(nn.Module):
     def __init__(self, config):
         super(MultiTaskClassificationModel, self).__init__()
@@ -48,10 +49,7 @@ class MultiTaskClassificationModel(nn.Module):
             attention_mask: Optional[torch.FloatTensor] = None,
             token_type_ids: Optional[torch.LongTensor] = None,
             ):
-        
-        
-        
-        
+        return None  
 
 class SingleTaskGenerationModel(nn.Module):
     def __init__(self, config):
@@ -80,3 +78,9 @@ class SingleTaskGenerationModel(nn.Module):
             'attentions': outputs.attentions,
             'cross_attentions' : outputs.cross_attentions,
         })
+    
+model_type = {
+    'classification_single': SingleTaskClassificationModel,
+    'classification_multi': MultiTaskClassificationModel,
+    'generation_single' : SingleTaskGenerationModel
+}

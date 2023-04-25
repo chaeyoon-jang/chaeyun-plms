@@ -7,6 +7,7 @@ import datetime
 import torch
 from torch import nn
 from torch import cuda
+from functools import partial
 
 import json
 from tqdm import tqdm
@@ -31,8 +32,6 @@ def validate(
                             token_type_ids=token_type_ids)
 
             if criterion:
-                if task == 'stsb':
-                    targets = targets / 5.0
                 loss = criterion(outputs.logits, targets) 
                 valid_loss += loss.item()
             
@@ -49,7 +48,7 @@ def train(
     device = 'cuda' if config.common.gpu > 0 else 'cpu'
 
     train_loader, valid_loader = data_loader
-    optimizer, lr_scheduler = optimizers
+    (optimizer, lr_scheduler), _ = optimizers
 
     best_acc = 0.0
     best_metric = 0.0
@@ -58,6 +57,7 @@ def train(
 
         train_loss = 0.0
         train_acc = 0.0
+
         model.train()
         epoch_start = time.time()
         total = len(train_loader)
@@ -69,17 +69,13 @@ def train(
                 input_ids = data['input_ids'].cuda(config.device)
                 attention_mask = data['attention_mask'].cuda(device)
                 token_type_ids = data['token_type_ids'].cuda(device)
-                targets = data['label'].to(torch.int64).cuda(device)
+                targets = data['label'].cuda(device)
 
                 outputs = model(input_ids=input_ids, 
                                 attention_mask=attention_mask,
                                 token_type_ids=token_type_ids)
                 
                 with torch.autocast('cuda'):
-                    if config.dataset.name == 'stsb':
-                        outputs['logits'] = outputs['logits'].to(torch.float32)
-                        targets = targets / 5.0
-                        targets = targets.to(torch.float32)
                     loss = criterion(outputs['logits'], targets)
                     acc, _ = metric.calculate(outputs['logits'], targets)
 
@@ -100,10 +96,13 @@ def train(
         elapse_time = time.time() - epoch_start
         elapse_time = datetime.timedelta(seconds=elapse_time)
 
-        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} | train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
-        epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, metric, valid_loader, config.dataset.name, device)
+        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} |\
+               train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
+        epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, 
+                                                                      metric, valid_loader, config.dataset.name, device)
 
-        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} | valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
+        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} |\
+               valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
         
         if epoch_valid_acc > best_acc:
                 best_add = epoch_valid_add * 100
@@ -115,28 +114,23 @@ def train(
                 }, p.join(config.common.save_dir, 
                           f'{config.dataset.name}_{config.optimizer.learning_rate}_{config.common.seed}.pt'))
 
-def train_swa(model, 
-          criterion, 
-          metric, 
-          optimizer, 
-          lr_scheduler,
-          swa_optim,
-          swa_epoch,
-          train_loader, 
-          valid_loader,
-          epochs,
-          task,
-          device,
-          ckpt_path,
-          args):
-    
+def train_swa(
+        model, criterion, metric, optimizers, data_loader, config):
+
+    device = 'cuda' if config.common.gpu > 0 else 'cpu'
+
+    train_loader, valid_loader = data_loader
+    (optimizer, lr_scheduler), swa_optimizers = optimizers
+    swa_scheduler, swa_model = swa_optimizers
+
     best_acc = 0.0
-    best_add = 0.0
-    swa_model, swa_scheduler = swa_optim
-    for epoch in range(epochs):
+    best_metric = 0.0
+
+    for epoch in range(config.common.n_epochs):
 
         train_loss = 0.0
         train_acc = 0.0
+
         model.train()
         epoch_start = time.time()
         total = len(train_loader)
@@ -144,35 +138,32 @@ def train_swa(model,
         with tqdm(total=total) as pbar:
             for batch_idx, data in enumerate(train_loader):
                 start = time.time()
+
                 input_ids = data['input_ids'].cuda(device)
                 attention_mask = data['attention_mask'].cuda(device)
                 token_type_ids = data['token_type_ids'].cuda(device)
-                targets = data['label'].to(torch.int64).cuda(device)
+                targets = data['label'].cuda(device)
 
                 outputs = model(input_ids=input_ids, 
                                 attention_mask=attention_mask,
                                 token_type_ids=token_type_ids)
 
                 with torch.autocast('cuda'):
-                    if task == 'stsb':
-                        outputs['logits'] = outputs['logits'].to(torch.float32)
-                        targets = targets / 5.0
-                        targets = targets.to(torch.float32)
                     loss = criterion(outputs['logits'], targets)
                     acc, _ = metric.calculate(outputs['logits'], targets)
 
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+    
+                if (epoch <= config.swa.start_epoch) & (config.optimizer.name != 'sgd') :      
+                    lr_scheduler.step()
 
                 train_loss += loss.item()
                 train_acc += acc
                 pbar.update(1)
-    
-                if epoch <= swa_epoch:      
-                    lr_scheduler.step()
-        
-        if epoch > swa_epoch:
+
+        if epoch > config.swa.start_epoch:
             swa_model.update_parameters(model)
             swa_scheduler.step() 
 
@@ -182,25 +173,29 @@ def train_swa(model,
         elapse_time = time.time() - epoch_start
         elapse_time = datetime.timedelta(seconds=elapse_time)
 
-        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} | train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
+        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} |\
+               train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
         
-        if epoch > swa_epoch:
-            epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(swa_model, criterion, metric, valid_loader, task, device)
-        else:
-            epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, metric, valid_loader, task, device)
+        validate_fn = partial(validate, criterion=criterion, 
+                              metric=metric, valid_loader=valid_loader, 
+                              task=config.dataset.name, device=device)
         
-        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} | valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
+        epoch_valid_loss, epoch_valid_acc, epoch_valid_metric = validate_fn(model=swa_model)\
+            if epoch > config.swa.start_epoch else validate_fn(model=model)
+        
+        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} |\
+               valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_metric:.4f}%")
 
         if epoch_valid_acc > best_acc:
-            best_add = epoch_valid_add * 100
+            best_add = epoch_valid_metric * 100
             best_acc = epoch_valid_acc
-            if epoch > swa_epoch:
+            if epoch > config.swa.start_epoch:
                 torch.optim.swa_utils.update_bn(train_loader, swa_model)
                 torch.save({
                     'epoch':epoch,
                     'model_state_dict': swa_model.state_dict(),
                     'best_acc':best_acc
-                    }, p.join(ckpt_path, f'{task}_{args.seed}_swa.pt'))
+                    }, p.join(config.common.save_path, f'{config.dataset.name}_{config.common.seed}_swa.pt'))
                 
 def train_multi(
         model, criterion, metric, optimizers, data_loader, config):
@@ -259,10 +254,13 @@ def train_multi(
         elapse_time = time.time() - epoch_start
         elapse_time = datetime.timedelta(seconds=elapse_time)
 
-        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} | train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
-        epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, metric, valid_loader, config.dataset.name, device)
+        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} |\
+               train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
+        epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, 
+                                                                      metric, valid_loader, config.dataset.name, device)
 
-        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} | valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
+        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} |\
+               valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
         
         if epoch_valid_acc > best_acc:
                 best_add = epoch_valid_add * 100

@@ -46,4 +46,4 @@ def get_optimizer(model, config):
     else:
         swa_optim = None
 
-    return optimizer, scheduler, swa_optim
+    return ((optimizer, scheduler), swa_optim)

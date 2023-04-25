@@ -1,5 +1,25 @@
 import datasets
 import torch
+from torch import nn
+
+class chaeyun_criterion(nn.Module):
+    def __init__(self, type):
+        super(chaeyun_criterion, self).__init__()
+        self.loss_fn =  torch.nn.MSELoss() if type == 'regression' else torch.nn.CrossEntropyLoss()
+        self.type = type
+    
+    def forward(self, logits, targets):
+
+        if type == 'generation':
+            logits  = logits[..., :-1, :].contiguous()
+            targets = targets[..., 1:].contiguous()
+        
+        if type == 'regression':
+            logits = logits.to(torch.float32)
+            targets = targets / 5.0
+            targets = targets.to(torch.float32)
+
+        return self.loss_fn(logits, targets)
 
 class metrics:
     def __init__(self, task_flag):

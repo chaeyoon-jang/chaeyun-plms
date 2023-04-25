@@ -1,6 +1,6 @@
 import torch
-from torch.utils.data import Dataset, DataLoader, random_split
 from .utils import seed_worker
+from torch.utils.data import Dataset, DataLoader, random_split
 
 task_text_field_map = {
             'cola': ['sentence'],
