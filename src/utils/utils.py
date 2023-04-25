@@ -2,8 +2,9 @@ import random
 import os
 import yaml
 import torch
-from torch.backends import cudnn
 import numpy as np
+from torch.backends import cudnn
+from collections import OrderedDict
 
 def set_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -56,3 +57,16 @@ def chaeyun_load(path, swa_path):
             add_config = yaml.safe_load(file)
         config.update(add_config)
     return convert_dict(config)
+
+def detach_module(state_dict):
+    new_state_dict = OrderedDict()
+    for k, v in state_dict['model_state_dict'].items():
+         if k == 'n_averaged':
+              continue
+         if 'module' in k:
+              name = k[14:]
+              new_state_dict[name] = v
+         else:
+              name = k
+              new_state_dict[name] = v
+    return new_state_dict

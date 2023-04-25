@@ -12,7 +12,7 @@ import torch.distributed as dist
 import torch.multiprocessing as mp
 from torch.utils.data import DataLoader, distributed
 from transformers import DataCollatorWithPadding
-from transformers import RobertaTokenizer, AutoConfig
+from transformers import AutoTokenizer, AutoConfig
 
 from .model import model_type
 from .utils import set_seed, configure_cudnn, chaeyun_load
@@ -91,7 +91,7 @@ def main_worker(gpu, n_gpus_per_node, config, args):
     print("Preparing data...")
 
     data = datasets.load_dataset('glue', config.dataset.name)
-    tokenizer = RobertaTokenizer.from_pretrained(config.model.name)
+    tokenizer = AutoTokenizer.from_pretrained(config.model.name)
     max_len = config.dataset.max_seq_length
     padding = 'max_length' if config.dataset.pad_to_max_length else False
     train_loader, valid_loader, test_loader = make_dataloader(
