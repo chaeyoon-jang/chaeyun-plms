@@ -1,17 +1,16 @@
 import torch
-from transformers.optimization import AdamW
 from torch.optim import SGD
-from torch.optim.lr_scheduler import LambdaLR
 from torch.optim.swa_utils import SWALR
+from transformers.optimization import AdamW
 from transformers import get_linear_schedule_with_warmup
 
-def get_optimizer(model, args):
+def get_optimizer(model, config):
 
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
             {
                 "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
-                "weight_decay": args.weight_decay,
+                "weight_decay": config.optimizer.weight_decay,
             },
             {
                 "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
@@ -19,29 +18,29 @@ def get_optimizer(model, args):
             },
     ]
 
-    if args.optimizer == "adamw":
+    if config.optimizer.name == "adamw":
         optimizer = AdamW(optimizer_grouped_parameters,
-                            lr=args.learning_rate,
-                            eps=args.adam_epsilon,
-                            betas=(0.9,0.98))
+                            lr=config.optimizer.learning_rate,
+                            eps=config.optimizer.adam_epsilon,
+                            betas=(config.optimizer.adam_betas[0], config.optmizer.adam_betas[0]))
 
         scheduler = get_linear_schedule_with_warmup(
                 optimizer,
-                num_warmup_steps=args.warmup_steps,
-                num_training_steps=args.total_steps)
+                num_warmup_steps=config.lr_scheduler.warmup_steps,
+                num_training_steps=config.lr_sheduler.total_steps)
     
-    elif args.optimizer == "sgd":
+    elif config.optimizer.name == "sgd":
         optimizer = SGD(optimizer_grouped_parameters,
-                        lr=args.learning_rate,
-                        momentum=args.optim_momentum)
+                        lr=config.optimizer.learning_rate,
+                        momentum=config.optmizer.optim_momentum)
         scheduler = get_linear_schedule_with_warmup(
                 optimizer,
-                num_warmup_steps=args.warmup_steps,
-                num_training_steps=args.total_steps)
+                num_warmup_steps=config.lr_scheduler.warmup_steps,
+                num_training_steps=config.lr_scheduler.total_steps)
         
-    if args.is_swa:
+    if config.swa.is_swa:
         swa_model = torch.optim.swa_utils.AveragedModel(model)
-        swa_scheduler = SWALR(optimizer, swa_lr=args.swa_learning_rate)
+        swa_scheduler = SWALR(optimizer, swa_lr=config.swa.learning_rate)
         swa_optim = (swa_model, swa_scheduler)
     
     else:

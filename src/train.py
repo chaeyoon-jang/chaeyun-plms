@@ -5,22 +5,20 @@ import time
 import datetime
 
 import torch
-import json
+from torch import nn
 from torch import cuda
+
+import json
 from tqdm import tqdm
 
-def validate(model,
-             criterion,
-             metric,
-             valid_loader, 
-             task,
-             device):
+def validate(
+        model, criterion, metric, valid_loader, task, device):
     
     model.eval()
     with torch.no_grad():
         valid_loss = 0.0
         valid_acc = 0.0
-        valid_add = 0.0
+        valid_metric = 0.0
         for batch_idx, data in enumerate(valid_loader):
 
             input_ids = data['input_ids'].to(device)
@@ -35,37 +33,28 @@ def validate(model,
             if criterion:
                 if task == 'stsb':
                     targets = targets / 5.0
-                loss = criterion(outputs['logits'], targets)
+                loss = criterion(outputs.logits, targets) 
                 valid_loss += loss.item()
             
-            acc, add = metric.calculate(outputs['logits'], targets)
+            acc, _metric = metric.calculate(outputs.logits, targets)
 
             valid_acc += acc
-            valid_add += add
+            valid_metric += _metric
     
-    return valid_loss / len(valid_loader), valid_acc / len(valid_loader), valid_add / len(valid_loader)
+    return valid_loss / len(valid_loader), valid_acc / len(valid_loader), valid_metric / len(valid_loader)
 
-
-def train(model, 
-          criterion, 
-          metric, 
-          optimizer, 
-          lr_scheduler,
-          train_loader, 
-          valid_loader,
-          epochs,
-          task,
-          device,
-          ckpt_path,
-          args):
+def train(
+        model, criterion, metric, optimizers, data_loader, config):
     
+    device = 'cuda' if config.common.gpu > 0 else 'cpu'
+
+    train_loader, valid_loader = data_loader
+    optimizer, lr_scheduler = optimizers
+
     best_acc = 0.0
-    best_add = 0.0
-    train_results1 = []
-    train_results2 = []
-    results1 = []
-    results2 = []
-    for epoch in range(epochs):
+    best_metric = 0.0
+
+    for epoch in range(config.common.n_epochs):
 
         train_loss = 0.0
         train_acc = 0.0
@@ -77,7 +66,7 @@ def train(model,
             for batch_idx, data in enumerate(train_loader):
                 start = time.time()
 
-                input_ids = data['input_ids'].cuda(device)
+                input_ids = data['input_ids'].cuda(config.device)
                 attention_mask = data['attention_mask'].cuda(device)
                 token_type_ids = data['token_type_ids'].cuda(device)
                 targets = data['label'].to(torch.int64).cuda(device)
@@ -87,7 +76,7 @@ def train(model,
                                 token_type_ids=token_type_ids)
                 
                 with torch.autocast('cuda'):
-                    if task == 'stsb':
+                    if config.dataset.name == 'stsb':
                         outputs['logits'] = outputs['logits'].to(torch.float32)
                         targets = targets / 5.0
                         targets = targets.to(torch.float32)
@@ -98,13 +87,12 @@ def train(model,
                 loss.backward()
                 optimizer.step()
 
-                if args.optimizer != 'sgd':
+                if config.optimizer.name != 'sgd':
                     lr_scheduler.step()
 
                 train_loss += loss.item()
                 train_acc += acc
                 pbar.update(1)
-                
 
         epoch_train_loss = train_loss / len(train_loader)
         epoch_train_acc = train_acc / len(train_loader)
@@ -113,12 +101,7 @@ def train(model,
         elapse_time = datetime.timedelta(seconds=elapse_time)
 
         print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} | train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
-        epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, metric, valid_loader, task, device)
-        
-        results1.append(epoch_valid_acc)
-        results2.append(epoch_valid_add)
-        train_results1.append(epoch_train_loss)
-        train_results2.append(epoch_train_acc)
+        epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, metric, valid_loader, config.dataset.name, device)
 
         print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} | valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
         
@@ -129,17 +112,8 @@ def train(model,
                     'epoch':epoch,
                     'model_state_dict': model.module.state_dict(),
                     'best_metric':best_add,
-                }, p.join(ckpt_path, f'{task}_{args.learning_rate}_{args.seed}.pt'))
-        
-
-    results = {
-        'train_loss':train_results1,
-        'train_acc':train_results2,
-        'valid_acc':results1,
-        'valid_metric':results2
-    }
-    with open(f'{task}_{args.learning_rate}_{args.seed}.json', 'w') as f:
-        json.dump(results, f)
+                }, p.join(config.common.save_dir, 
+                          f'{config.dataset.name}_{config.optimizer.learning_rate}_{config.common.seed}.pt'))
 
 def train_swa(model, 
           criterion, 
@@ -159,10 +133,6 @@ def train_swa(model,
     best_acc = 0.0
     best_add = 0.0
     swa_model, swa_scheduler = swa_optim
-    train_results1 = []
-    train_results2 = []
-    valid_results1 = []
-    valid_results2 = []
     for epoch in range(epochs):
 
         train_loss = 0.0
@@ -221,11 +191,6 @@ def train_swa(model,
         
         print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} | valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
 
-        train_results1.append(epoch_train_loss)
-        train_results2.append(epoch_train_acc)
-        valid_results1.append(epoch_valid_acc)
-        valid_results2.append(epoch_valid_add)
-
         if epoch_valid_acc > best_acc:
             best_add = epoch_valid_add * 100
             best_acc = epoch_valid_acc
@@ -236,17 +201,75 @@ def train_swa(model,
                     'model_state_dict': swa_model.state_dict(),
                     'best_acc':best_acc
                     }, p.join(ckpt_path, f'{task}_{args.seed}_swa.pt'))
+                
+def train_multi(
+        model, criterion, metric, optimizers, data_loader, config):
     
-    results = {
-        'train_loss':train_results1,
-        'train_acc':train_results2,
-        'valid_acc':valid_results1,
-        'valid_metric':valid_results2
-    }
-    with open(f'swa_{task}_{args.seed}.json', 'w') as f:
-        json.dump(results, f)
-    torch.save({
-        'epoch':epoch,
-        'model_state_dict':swa_model.state_dict(),
-        'best_acc': best_acc,
-    }, p.join(ckpt_path, f'{task}_{args.seed}_swa.pt'))
+    device = 'cuda' if config.common.gpu > 0 else 'cpu'
+
+    train_loader, valid_loader = data_loader
+    optimizer, lr_scheduler = optimizers
+
+    best_acc = 0.0
+    best_metric = 0.0
+
+    for epoch in range(config.common.n_epochs):
+
+        train_loss = 0.0
+        train_acc = 0.0
+        model.train()
+        epoch_start = time.time()
+        total = len(train_loader)
+
+        with tqdm(total=total) as pbar:
+            for batch_idx, data in enumerate(train_loader):
+                start = time.time()
+
+                input_ids = data['input_ids'].cuda(config.device)
+                attention_mask = data['attention_mask'].cuda(device)
+                token_type_ids = data['token_type_ids'].cuda(device)
+                targets = data['label'].to(torch.int64).cuda(device)
+
+                outputs = model(input_ids=input_ids, 
+                                attention_mask=attention_mask,
+                                token_type_ids=token_type_ids)
+                
+                with torch.autocast('cuda'):
+                    if config.dataset.name == 'stsb':
+                        outputs['logits'] = outputs['logits'].to(torch.float32)
+                        targets = targets / 5.0
+                        targets = targets.to(torch.float32)
+                    loss = criterion(outputs['logits'], targets)
+                    acc, _ = metric.calculate(outputs['logits'], targets)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+                if config.optimizer.name != 'sgd':
+                    lr_scheduler.step()
+
+                train_loss += loss.item()
+                train_acc += acc
+                pbar.update(1)
+
+        epoch_train_loss = train_loss / len(train_loader)
+        epoch_train_acc = train_acc / len(train_loader)
+
+        elapse_time = time.time() - epoch_start
+        elapse_time = datetime.timedelta(seconds=elapse_time)
+
+        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} | train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
+        epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, metric, valid_loader, config.dataset.name, device)
+
+        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} | valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
+        
+        if epoch_valid_acc > best_acc:
+                best_add = epoch_valid_add * 100
+                best_acc = epoch_valid_acc
+                torch.save({
+                    'epoch':epoch,
+                    'model_state_dict': model.module.state_dict(),
+                    'best_metric':best_add,
+                }, p.join(config.common.save_dir, 
+                          f'{config.dataset.name}_{config.optimizer.learning_rate}_{config.common.seed}.pt'))
