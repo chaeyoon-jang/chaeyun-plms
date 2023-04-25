@@ -230,10 +230,6 @@ def train_multi(
                                 token_type_ids=token_type_ids)
                 
                 with torch.autocast('cuda'):
-                    if config.dataset.name == 'stsb':
-                        outputs['logits'] = outputs['logits'].to(torch.float32)
-                        targets = targets / 5.0
-                        targets = targets.to(torch.float32)
                     loss = criterion(outputs['logits'], targets)
                     acc, _ = metric.calculate(outputs['logits'], targets)
 

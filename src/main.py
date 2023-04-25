@@ -17,7 +17,7 @@ from transformers import AutoTokenizer, AutoConfig
 from .model import model_type
 from .utils import set_seed, configure_cudnn, chaeyun_load
 from .utils.metric import glue_metrics, chaeyun_criterion
-from .utils.dataset import make_dataloader
+from .utils.dataset import make_glue_dataloader
 from .utils.lr_scheduler import get_optimizer
 from .train import train, train_swa, validate
 
@@ -44,16 +44,16 @@ def main():
     parser = get_arg_parser()
     args = parser.parse_args()
 
-    default_path = ['./finetuning', f'{args.data_type}-base', f'{args.task_type}.yaml']
+    default_path = ['./src/finetuning', f'{args.data_type}-base', f'{args.task_type}.yaml']
     config_path = os.path.join(*default_path)
 
     swa_path = None
     if args.is_swa:
-        swa_path = ['./finetuning', f'{args.data_type}-swa', f'{args.task_type}.yaml']
+        swa_path = ['./src/finetuning', f'{args.data_type}-swa', f'{args.task_type}.yaml']
         swa_path = os.path.join(*swa_path)
 
-    config = chaeyun_load(args.config_path, swa_path)
-    
+    config = chaeyun_load(config_path, swa_path)
+
     set_seed(config.common.seed)
     configure_cudnn(False)
     n_gpus_per_node = cuda.device_count()
@@ -92,13 +92,7 @@ def main_worker(gpu, n_gpus_per_node, config, args):
 
     data = datasets.load_dataset('glue', config.dataset.name)
     tokenizer = AutoTokenizer.from_pretrained(config.model.name)
-    max_len = config.dataset.max_seq_length
-    padding = 'max_length' if config.dataset.pad_to_max_length else False
-    train_loader, valid_loader, test_loader = make_dataloader(
-        config.dataset.batch_size,
-        data, config.common.num_workers,
-        config.dataset.name, tokenizer, 
-        padding, max_len, config.common.seed)
+    train_loader, valid_loader, test_loader = make_glue_dataloader(data, tokenizer, config.dataset)
     data_loader = (train_loader, valid_loader)
 
     print("Start training...")

@@ -21,7 +21,7 @@ class chaeyun_criterion(nn.Module):
 
         return self.loss_fn(logits, targets)
 
-class metrics:
+class glue_metrics:
     def __init__(self, task_flag):
         self.metric_fn = datasets.load_metric('glue', task_flag)
         self.task_flag = task_flag

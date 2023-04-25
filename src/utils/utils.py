@@ -50,11 +50,12 @@ def type_dump(attr):
     return attr
 
 def chaeyun_load(path, swa_path):
-    with open(path, 'w') as file:
-        config = yaml.safe_load(file)
+    with open(path) as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+        print(config)
     if swa_path is not None:
-        with open(swa_path) as file:
-            add_config = yaml.safe_load(file)
+        with open(swa_path) as f:
+           add_config = yaml.load(f, Loader=yaml.FullLoader)
         config.update(add_config)
     return convert_dict(config)
 

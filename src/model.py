@@ -35,7 +35,7 @@ class SingleTaskClassificationModel(nn.Module):
             'attention': outputs.attentions,
         })
 
-#TO DO: make a multi-task fine-tuning model
+# TODO: make a multi-task fine-tuning model
 class MultiTaskClassificationModel(nn.Module):
     def __init__(self, config):
         super(MultiTaskClassificationModel, self).__init__()

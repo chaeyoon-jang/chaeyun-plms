@@ -1,6 +1,5 @@
 common:
   seed: 42
-  num_workers: 4
   gpu_devices: 2
   gpu: 0,1
   dist_url: tcp://127.0.0.1:32461
@@ -14,6 +13,7 @@ common:
 dataset:
   _name: mnli
   num_classes: 3
+  num_workers: 4
   batch_size: 32
   max_seq_length: 600
   pad_to_max_length: true
