@@ -66,7 +66,7 @@ def train(
             for batch_idx, data in enumerate(train_loader):
                 start = time.time()
 
-                input_ids = data['input_ids'].cuda(config.device)
+                input_ids = data['input_ids'].cuda(device)
                 attention_mask = data['attention_mask'].cuda(device)
                 token_type_ids = data['token_type_ids'].cuda(device)
                 targets = data['label'].cuda(device)
