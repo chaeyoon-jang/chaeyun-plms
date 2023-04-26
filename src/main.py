@@ -31,7 +31,7 @@ def get_arg_parser():
     
     parser.add_argument('--data-type', '-d', type=str, default='glue')
     parser.add_argument('--task-type', '-t', type=str, default='cola')
-    parser.add_argument('--training_type', type=str, default='single')
+    parser.add_argument('--training-type', type=str, default='single')
     parser.add_argument('--is-swa', '-s', type=bool, default=False)
     parser.add_argument('--DEBUG', dest='debug', action='store_true')
     parser.add_argument('--NO-DEBUG', dest='debug', action='store_false')

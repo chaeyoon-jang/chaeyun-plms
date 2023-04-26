@@ -1,7 +1,7 @@
 # Pretrained Language Models (PLMs) Baseline
 This repository contains the code for fine-tuning any PLMs provided by HuggingFace on Benchmark tasks.
 
-<b>Note: the baselines provided in this repository aim to contribute to the research on generalization by exploring the loss surfaces of PLMs. Accordingly, [stochastic weight averaging (SWA)](https://arxiv.org/abs/1803.05407) and [sharpness aware minimization (SAM)](https://arxiv.org/abs/2010.01412) optimization methods are additionally provided.</b>
+<b>Note:</b> the baselines provided in this repository aim to contribute to the research on generalization by exploring the loss surfaces of PLMs. Accordingly, [stochastic weight averaging (SWA)](https://arxiv.org/abs/1803.05407) and [sharpness aware minimization (SAM)](https://arxiv.org/abs/2010.01412) are also provided as optimization methods.
 
 # Dependencies
 * [PyTorch](http://pytorch.org/)
@@ -9,6 +9,24 @@ This repository contains the code for fine-tuning any PLMs provided by HuggingFa
 * [Datasets](https://huggingface.co/docs/datasets/)
 
 # Usage
+You can train the endpoints using the following command.
+
+```bash
+sh ./scripts/train_glue_gpu1.sh --data-type=<BENCHMARK> \
+                                --task-type=<TASK_TYPE> \
+                                --trainig-type=<TRAIN_TYPE> \
+                                --is-swa=<SWA_OR_NOT> \
+                                --NO-DEBUG \
+```
+
+Parameters:
+
+* ```BENCHMARK``` &mdash; benchmark name [glue/squad] (default: glue)
+* ```DATASET``` &mdash; task name for glue datasets [cola/rte/mnli/qnli/qqp/mrpc/stsb/sst2]
+* ```TRAIN_TYPE``` &mdash; fine-tuning type [single-task/multi-task]
+* ```SWA_OR_NOT``` &mdash; turn on swa mode or not
+
+Use the `--DEBUG` flag if you want to debug your codes.
 
 # Example Results
 
