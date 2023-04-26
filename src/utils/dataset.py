@@ -48,7 +48,7 @@ def make_glue_dataloader(dataframe, tokenizer, config):
             texts_or_text_pairs = example_batch[text_fields[0]]
                 
         features = tokenizer.batch_encode_plus(texts_or_text_pairs,
-                                               max_length=config.max_sequence_length,
+                                               max_length=config.max_seq_length,
                                                padding=padding,
                                                add_special_tokens=True,
                                                return_token_type_ids=True) 

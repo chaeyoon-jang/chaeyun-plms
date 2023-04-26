@@ -1,1 +1,1 @@
-python -m src.main --data-type glue --task-type cola --DEBUG
+python -m src.main --data-type glue --task-type cola --NO-DEBUG

@@ -1,0 +1,37 @@
+common:
+  seed: 42
+  gpu_devices: 1
+  gpu: 0
+  dist_url: tcp://127.0.0.1:32466
+  dist_backend: nccl
+  rank: 0
+  world_size: 1
+  distributed: true
+  save_dir: ./cola
+  n_epochs: 20
+
+dataset:
+  name: cola
+  type: classification
+  num_classes: 2
+  num_workers: 4
+  batch_size: 16
+  max_seq_length: 600
+  pad_to_max_length: true
+
+optimizer:
+  name: adamw
+  weight_decay: 0.1
+  learning_rate: 2e-05
+  adam_betas: [0.9, 0.98]
+  adam_eps: 1e-06
+
+lr_scheduler:
+  name: linear_decay
+  warmup_ratio: 0.1
+
+model:
+  name: roberta-base
+  hidden_size: 768
+  dropout: 0.1
+  attention_dropout: 0.1

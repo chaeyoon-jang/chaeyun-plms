@@ -35,9 +35,8 @@ class convert_dict:
         self._parse()
     
     def _parse(self):
-        for k in self._temp_dict.iterkeys():
+        for k in self._temp_dict.keys():
             v = self._temp_dict[k]
-            v = type_dump(v)
             if type(v) == dict:
                 v = convert_dict(v)
             setattr(self, k, v)
@@ -47,15 +46,14 @@ def type_dump(attr):
         c_attr = float(attr)
     except:
         c_attr = attr
-    return attr
+    return c_attr
 
 def chaeyun_load(path, swa_path):
-    with open(path) as f:
-        config = yaml.load(f, Loader=yaml.FullLoader)
-        print(config)
+    with open(path, 'r') as f:
+        config = yaml.safe_load(f)
     if swa_path is not None:
-        with open(swa_path) as f:
-           add_config = yaml.load(f, Loader=yaml.FullLoader)
+        with open(swa_path, 'r') as f:
+           add_config = yaml.safe_load(f)
         config.update(add_config)
     return convert_dict(config)
 

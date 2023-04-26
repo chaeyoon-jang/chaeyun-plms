@@ -99,7 +99,8 @@ def train(
         print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} |\
                train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
         epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, 
-                                                                      metric, valid_loader, config.dataset.name, device)
+                                                                      metric, valid_loader, 
+                                                                      config.dataset.name, device)
 
         print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} |\
                valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
@@ -253,7 +254,8 @@ def train_multi(
         print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} |\
                train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
         epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, 
-                                                                      metric, valid_loader, config.dataset.name, device)
+                                                                      metric, valid_loader, 
+                                                                      config.dataset.name, device)
 
         print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} |\
                valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")

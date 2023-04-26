@@ -76,12 +76,12 @@ def main_worker(gpu, n_gpus_per_node, config, args):
     
     print("Making model...")
 
-    model = model_type[f'{config.dataset.type}_{args.type}'](config)
+    model = model_type[f'{config.dataset.type}_{args.training_type}'](config)
     cuda.set_device(config.common.gpu)
     model.cuda(config.common.gpu)
 
     config.dataset.batch_size = int(config.dataset.batch_size / n_gpus_per_node)
-    config.common.num_worker = int(config.common.num_workers / n_gpus_per_node)
+    config.dataset.num_worker = int(config.dataset.num_workers / n_gpus_per_node)
 
     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[config.common.gpu])
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -107,7 +107,7 @@ def main_worker(gpu, n_gpus_per_node, config, args):
     train_module = partial(train_swa, model=model, criterion=criterion, metric=metric)\
         if args.is_swa else partial(train, model=model, criterion=criterion, metric=metric)
     
-    train_module(optimizers, data_loader, config)
+    train_module(optimizers=optimizers, data_loader=data_loader, config=config)
 
 if __name__ == '__main__':
     main()

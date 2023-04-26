@@ -16,29 +16,31 @@ def get_optimizer(model, config):
 
     if config.optimizer.name == "adamw":
         optimizer = AdamW(optimizer_grouped_parameters,
-                          lr=config.optimizer.learning_rate,
-                          eps=config.optimizer.adam_epsilon,
-                          betas=(config.optimizer.adam_betas[0], config.optmizer.adam_betas[0]))
+                          lr=float(config.optimizer.learning_rate),
+                          eps=float(config.optimizer.adam_eps),
+                          betas=(config.optimizer.adam_betas[0], config.optimizer.adam_betas[0]))
 
         scheduler = get_linear_schedule_with_warmup(optimizer,
                                                     num_warmup_steps=config.lr_scheduler.warmup_steps,
-                                                    num_training_steps=config.lr_sheduler.total_steps)
+                                                    num_training_steps=config.lr_scheduler.total_steps)
     
     elif config.optimizer.name == "sgd":
         optimizer = SGD(optimizer_grouped_parameters,
-                        lr=config.optimizer.learning_rate,
+                        lr=float(config.optimizer.learning_rate),
                         momentum=config.optmizer.optim_momentum)
         
         scheduler = get_linear_schedule_with_warmup(optimizer,
                                                     num_warmup_steps=config.lr_scheduler.warmup_steps,
                                                     num_training_steps=config.lr_scheduler.total_steps)
         
-    if config.swa.is_swa:
+    try:
+        # if config include swa arguments, 
         swa_model = torch.optim.swa_utils.AveragedModel(model)
-        swa_scheduler = SWALR(optimizer, swa_lr=config.swa.learning_rate)
+        swa_scheduler = SWALR(optimizer, swa_lr=float(config.swa.learning_rate))
         swa_optim = (swa_model, swa_scheduler)
     
-    else:
+    except:
+        # else,
         swa_optim = None
 
     return ((optimizer, scheduler), swa_optim)
