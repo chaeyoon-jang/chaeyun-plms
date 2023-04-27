@@ -66,18 +66,18 @@ def train(
             for batch_idx, data in enumerate(train_loader):
                 start = time.time()
 
-                input_ids = data['input_ids'].cuda(device)
-                attention_mask = data['attention_mask'].cuda(device)
-                token_type_ids = data['token_type_ids'].cuda(device)
-                targets = data['label'].cuda(device)
+                input_ids = data['input_ids'].cuda(config.common.gpu)
+                attention_mask = data['attention_mask'].cuda(config.common.gpu)
+                token_type_ids = data['token_type_ids'].cuda(config.common.gpu)
+                targets = data['label'].cuda(config.common.gpu)
 
                 outputs = model(input_ids=input_ids, 
                                 attention_mask=attention_mask,
                                 token_type_ids=token_type_ids)
                 
                 with torch.autocast('cuda'):
-                    loss = criterion(outputs['logits'], targets)
-                    acc, _ = metric.calculate(outputs['logits'], targets)
+                    loss = criterion(outputs.logits, targets)
+                    acc, _ = metric.calculate(outputs.logits, targets)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -96,14 +96,12 @@ def train(
         elapse_time = time.time() - epoch_start
         elapse_time = datetime.timedelta(seconds=elapse_time)
 
-        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} |\
-               train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
+        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} | train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
         epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, 
                                                                       metric, valid_loader, 
-                                                                      config.dataset.name, device)
+                                                                      config.dataset.name, config.common.gpu)
 
-        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} |\
-               valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
+        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} | valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
         
         if epoch_valid_acc > best_acc:
                 best_add = epoch_valid_add * 100
@@ -140,18 +138,18 @@ def train_swa(
             for batch_idx, data in enumerate(train_loader):
                 start = time.time()
 
-                input_ids = data['input_ids'].cuda(device)
-                attention_mask = data['attention_mask'].cuda(device)
-                token_type_ids = data['token_type_ids'].cuda(device)
-                targets = data['label'].cuda(device)
+                input_ids = data['input_ids'].cuda(config.common.gpu)
+                attention_mask = data['attention_mask'].cuda(config.common.gpu)
+                token_type_ids = data['token_type_ids'].cuda(config.common.gpu)
+                targets = data['label'].cuda(config.common.gpu)
 
                 outputs = model(input_ids=input_ids, 
                                 attention_mask=attention_mask,
                                 token_type_ids=token_type_ids)
 
                 with torch.autocast('cuda'):
-                    loss = criterion(outputs['logits'], targets)
-                    acc, _ = metric.calculate(outputs['logits'], targets)
+                    loss = criterion(outputs.logits, targets)
+                    acc, _ = metric.calculate(outputs.logits, targets)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -179,13 +177,12 @@ def train_swa(
         
         validate_fn = partial(validate, criterion=criterion, 
                               metric=metric, valid_loader=valid_loader, 
-                              task=config.dataset.name, device=device)
+                              task=config.dataset.name, device=config.common.gpu)
         
         epoch_valid_loss, epoch_valid_acc, epoch_valid_metric = validate_fn(model=swa_model)\
             if epoch > config.swa.start_epoch else validate_fn(model=model)
         
-        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} |\
-               valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_metric:.4f}%")
+        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} | valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_metric:.4f}%")
 
         if epoch_valid_acc > best_acc:
             best_add = epoch_valid_metric * 100
@@ -221,18 +218,18 @@ def train_multi(
             for batch_idx, data in enumerate(train_loader):
                 start = time.time()
 
-                input_ids = data['input_ids'].cuda(config.device)
-                attention_mask = data['attention_mask'].cuda(device)
-                token_type_ids = data['token_type_ids'].cuda(device)
-                targets = data['label'].to(torch.int64).cuda(device)
+                input_ids = data['input_ids'].cuda(config.common.gpu)
+                attention_mask = data['attention_mask'].cuda(config.common.gpu)
+                token_type_ids = data['token_type_ids'].cuda(config.common.gpu)
+                targets = data['label'].to(torch.int64).cuda(config.common.gpu)
 
                 outputs = model(input_ids=input_ids, 
                                 attention_mask=attention_mask,
                                 token_type_ids=token_type_ids)
                 
                 with torch.autocast('cuda'):
-                    loss = criterion(outputs['logits'], targets)
-                    acc, _ = metric.calculate(outputs['logits'], targets)
+                    loss = criterion(outputs.logits, targets)
+                    acc, _ = metric.calculate(outputs.logits, targets)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -251,14 +248,12 @@ def train_multi(
         elapse_time = time.time() - epoch_start
         elapse_time = datetime.timedelta(seconds=elapse_time)
 
-        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} |\
-               train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
+        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} | train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
         epoch_valid_loss, epoch_valid_acc, epoch_valid_add = validate(model, criterion, 
                                                                       metric, valid_loader, 
-                                                                      config.dataset.name, device)
+                                                                      config.dataset.name, config.common.gpu)
 
-        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} |\
-               valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
+        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} | valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
         
         if epoch_valid_acc > best_acc:
                 best_add = epoch_valid_add * 100

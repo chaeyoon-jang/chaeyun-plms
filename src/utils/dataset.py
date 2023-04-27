@@ -29,7 +29,7 @@ loader_columns = [
 
 large_task = ['mnli', 'qqp', 'sst2', 'qnli']
 
-def make_glue_dataloader(dataframe, tokenizer, config):
+def make_glue_dataloader_v1(dataframe, tokenizer, config):
     
     padding = 'max_length' if config.pad_to_max_length else False
 
@@ -107,7 +107,73 @@ def make_glue_dataloader(dataframe, tokenizer, config):
                                      batch_size= config.batch_size,
                                      num_workers= config.num_workers) for x in eval_splits]
     
-    return train_loader, eval_loader, test_loader
+    torch.save(train_loader, os.path.join(config.dataset.save_dir, f'{config.dataset.name}_train_loader_v1.pth'))
+    torch.save(eval_loader,  os.path.join(config.dataset.save_dir, f'{config.dataset.name}_valid_loader_v1.pth'))
+    torch.save(test_loader,  os.path.join(config.dataset.save_dir, f'{config.dataset.name}_test_loader_v1.pth'))
+
+def make_glue_dataloader_v2(dataframe, tokenizer, config):
+    
+    padding = 'max_length' if config.pad_to_max_length else False
+
+    text_fields = task_text_field_map[config.name]
+    num_labels = glue_task_num_labels[config.name]
+
+    def convert_to_features(example_batch, indices=None):
+        
+        if len(text_fields) > 1:
+            texts_or_text_pairs = list(zip(example_batch[text_fields[0]], 
+                                               example_batch[text_fields[1]]))
+        else:
+            texts_or_text_pairs = example_batch[text_fields[0]]
+                
+        features = tokenizer.batch_encode_plus(texts_or_text_pairs,
+                                               max_length=config.max_seq_length,
+                                               padding=padding,
+                                               add_special_tokens=True,
+                                               return_token_type_ids=True) 
+            
+        features['label'] = example_batch['label']
+        return features
+       
+    for split in dataframe.keys():
+        dataframe[split] = dataframe[split].map(convert_to_features, batched=True)
+        columns = [c for c in dataframe[split].column_names if c in loader_columns]
+        dataframe[split].set_format(type="torch", columns=columns)
+
+    eval_splits = [x for x in dataframe.keys() if 'validation' in x]
+    test_splits = [x for x in dataframe.keys() if 'test' in x]
+
+    train_sampler = torch.utils.data.distributed.DistributedSampler(train_data)
+    
+    train_loader = DataLoader(train_data,
+                              batch_size = config.batch_size,
+                              num_workers = config.num_workers,
+                              sampler=train_sampler,
+                              worker_init_fn=seed_worker,
+                              shuffle=False)
+    
+    if len(eval_splits) == 1: 
+
+            eval_loader = DataLoader(dataframe['validation'],
+                                     batch_size = config.batch_size,
+                                     num_workers = config.num_workers)
+            
+            test_loader = DataLoader(dataframe['test'],
+                                     batch_size = config.batch_size,
+                                     num_workers = config.num_workers)
+            
+    elif len(eval_splits) > 1:
+           eval_loader = [DataLoader(dataframe[x],
+                                     batch_size= config.batch_size,
+                                     num_workers= config.num_workers) for x in eval_splits]
+           
+           test_loader = [DataLoader(dataframe[x],
+                                     batch_size= config.batch_size,
+                                     num_workers= config.num_workers) for x in test_splits]
+    
+    torch.save(train_loader, os.path.join(config.dataset.save_dir, f'{config.dataset.name}_train_loader_v2.pth'))
+    torch.save(eval_loader,  os.path.join(config.dataset.save_dir, f'{config.dataset.name}_valid_loader_v2.pth'))
+    torch.save(test_loader,  os.path.join(config.dataset.save_dir, f'{config.dataset.name}_test_loader_v2.pth'))
 
 # TODO: preprocessing function for squad dataset.
 # def make_squad_dataloader(dataframe, tokenizer, config): 

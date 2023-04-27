@@ -41,13 +41,6 @@ class convert_dict:
                 v = convert_dict(v)
             setattr(self, k, v)
 
-def type_dump(attr):
-    try:
-        c_attr = float(attr)
-    except:
-        c_attr = attr
-    return c_attr
-
 def chaeyun_load(path, swa_path):
     with open(path, 'r') as f:
         config = yaml.safe_load(f)
@@ -69,3 +62,16 @@ def detach_module(state_dict):
               name = k
               new_state_dict[name] = v
     return new_state_dict
+
+class chaeyun_average(object):
+    def __init__(self):
+        self.val = 0.0
+        self.avg = 0.0
+        self.sum = 0.0
+        self.count = 0
+    
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count 

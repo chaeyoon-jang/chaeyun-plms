@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from .utils import convert_dict
+from .utils import convert_dict, chaeyun_average
 from typing import Optional, Tuple
 from transformers import AutoModel
 
@@ -35,14 +35,18 @@ class SingleTaskClassificationModel(nn.Module):
             'attention': outputs.attentions,
         })
 
-# TODO: make a multi-task fine-tuning model
 class MultiTaskClassificationModel(nn.Module):
     def __init__(self, config):
         super(MultiTaskClassificationModel, self).__init__()
         self.model = AutoModel.from_pretrained(config.model.name, add_pooling_layer=False)
-        self.dense = nn.Linear(config.model.hidden_size, config.model.hidden_size)
-        self.dropout = nn.Dropout(config.model.dropout)
-        self.out = nn.Linear(config.model.hidden_size, config.dataset.num_classes)
+        self.task_specific_layers = nn.ModuleList()
+
+        for task_def in config.dataset.task.items():
+            num_classes = task_def.num_classes
+            task_type = task_def.type
+
+
+
     
     def forward(
             self, input_ids: Optional[torch.LongTensor] = None,
@@ -50,6 +54,8 @@ class MultiTaskClassificationModel(nn.Module):
             token_type_ids: Optional[torch.LongTensor] = None,
             ):
         return None  
+
+
 
 class SingleTaskGenerationModel(nn.Module):
     def __init__(self, config):

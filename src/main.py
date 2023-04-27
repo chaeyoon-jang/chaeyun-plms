@@ -17,12 +17,16 @@ from transformers import AutoTokenizer, AutoConfig
 from .model import model_type
 from .utils import set_seed, configure_cudnn, chaeyun_load
 from .utils.metric import glue_metrics, chaeyun_criterion
-from .utils.dataset import make_glue_dataloader
+from .utils.dataset import make_glue_dataloader_v1, make_glue_dataloader_v2
 from .utils.lr_scheduler import get_optimizer
 from .train import train, train_swa, validate
 
 import warnings
+import transformers
+
 warnings.filterwarnings('ignore')
+transformers.logging.set_verbosity_error()
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def get_arg_parser():
 
@@ -84,20 +88,33 @@ def main_worker(gpu, n_gpus_per_node, config, args):
     config.dataset.num_worker = int(config.dataset.num_workers / n_gpus_per_node)
 
     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[config.common.gpu])
-    num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    num_params = sum(params.numel() for params in model.parameters() if params.requires_grad)
 
     print("The number of parameters of model is {}...".format(num_params))
 
     print("Preparing data...")
 
-    data = datasets.load_dataset('glue', config.dataset.name)
     tokenizer = AutoTokenizer.from_pretrained(config.model.name)
-    train_loader, valid_loader, test_loader = make_glue_dataloader(data, tokenizer, config.dataset)
+
+    if args.data_type == 'glue':
+
+        version = config.dataset.save_dir[-2:]; name_ = 'train'
+        data_path = p.join(config.dataset.save_dir,f'{config.dataset.name}_{name_}_loader_{version}.pth')
+
+        if not p.isfile(data_path):
+            data = datasets.load_dataset('glue', config.dataset.name)
+            exec(f'make_glue_dataloader_{version}(data, tokenizer, config.dataset)')
+
+        for name_t in ['train','valid']:
+            name_ = name_t
+            exec(f'{name_}_loader = torch.load(data_path)')
+
     data_loader = (train_loader, valid_loader)
 
     print("Start training...")
 
     os.makedirs(config.common.save_dir, exist_ok=True)
+
     metric = glue_metrics(config.dataset.name)
     criterion = chaeyun_criterion(config.dataset.type)
     config.lr_scheduler.total_steps = int(len(train_loader) * config.common.n_epochs)
