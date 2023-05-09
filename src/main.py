@@ -17,7 +17,10 @@ from transformers import AutoTokenizer, AutoConfig
 from .model import model_type
 from .utils import set_seed, configure_cudnn, chaeyun_load
 from .utils.metric import glue_metrics, chaeyun_criterion
-from .utils.dataset import make_glue_dataloader_v1, make_glue_dataloader_v2
+from .utils.dataset import make_glue_dataloader_v1,\
+    make_glue_dataloader_v2,\
+        make_multi_glue_dataloader
+
 from .utils.lr_scheduler import get_optimizer
 from .train import train, train_swa, validate
 
@@ -35,7 +38,6 @@ def get_arg_parser():
     
     parser.add_argument('--data-type', '-d', type=str, default='glue')
     parser.add_argument('--task-type', '-t', type=str, default='cola')
-    parser.add_argument('--training-type', type=str, default='single')
     parser.add_argument('--is-swa', '-s', type=bool, default=False)
     parser.add_argument('--DEBUG', dest='debug', action='store_true')
     parser.add_argument('--NO-DEBUG', dest='debug', action='store_false')
@@ -71,7 +73,6 @@ def main_worker(gpu, n_gpus_per_node, config, args):
     configure_cudnn(False)
     
     config.common.gpu = gpu
-    n_gpus_per_node = cuda.device_count()
 
     print("Use GPU: {} for training...".format(config.common.gpu))
     config.common.rank = config.common.rank * n_gpus_per_node + gpu
@@ -79,8 +80,8 @@ def main_worker(gpu, n_gpus_per_node, config, args):
                             world_size=config.common.world_size, rank=config.common.rank)
     
     print("Making model...")
-
-    model = model_type[f'{config.dataset.type}_{args.training_type}'](config)
+    training_type = 'multi' if args.data_type == 'multi-task' else 'single'
+    model = model_type[f'{config.dataset.type}_{training_type}'](config)
     cuda.set_device(config.common.gpu)
     model.cuda(config.common.gpu)
 
@@ -95,29 +96,35 @@ def main_worker(gpu, n_gpus_per_node, config, args):
     print("Preparing data...")
 
     tokenizer = AutoTokenizer.from_pretrained(config.model.name)
-
+    
     if args.data_type == 'glue':
 
         version = config.dataset.save_dir[-2:]; name_ = 'train'
-        data_path = p.join(config.dataset.save_dir,f'{config.dataset.name}_{name_}_loader_{version}.pth')
+        data_path = p.join(config.dataset.save_dir,f'{args.task_type}_{name_}_loader_{version}.pth')
 
         if not p.isfile(data_path):
-            data = datasets.load_dataset('glue', config.dataset.name)
-            exec(f'make_glue_dataloader_{version}(data, tokenizer, config.dataset)')
+            os.makedirs(config.dataset.save_dir, exist_ok=True)
+            
+            if args.task_type == 'multi-task':
+                make_multi_glue_dataloader(tokenizer, config.dataset)
+                metric = multi_glue_metrics()
+            
+            else:
+                data = datasets.load_dataset('glue', config.dataset.name)
+                exec(f'make_glue_dataloader_{version}(data, tokenizer, config.dataset)')
+                metric = glue_metrics(config.dataset.name)
+        
+        data_loader = [torch.load(data_path) for name_ in ['train', 'valid']]
 
-        for name_t in ['train','valid']:
-            name_ = name_t
-            exec(f'{name_}_loader = torch.load(data_path)')
-
-    data_loader = (train_loader, valid_loader)
+    data_loader = (data_loader[0], data_loader[1])
 
     print("Start training...")
 
-    os.makedirs(config.common.save_dir, exist_ok=True)
-
-    metric = glue_metrics(config.dataset.name)
+    os.makedirs(p.join(config.common.save_dir,'./ckpt'), exist_ok=True)
+    os.makedirs(p.join(config.common.save_dif,'./log'),  exist_ok=True)
+    
     criterion = chaeyun_criterion(config.dataset.type)
-    config.lr_scheduler.total_steps = int(len(train_loader) * config.common.n_epochs)
+    config.lr_scheduler.total_steps = int(len(data_loader[0]) * config.common.n_epochs)
     config.lr_scheduler.warmup_steps = int(config.lr_scheduler.total_steps * config.lr_scheduler.warmup_ratio) 
     optimizers = get_optimizer(model, config)
 

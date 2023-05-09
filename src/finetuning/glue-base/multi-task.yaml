@@ -1,0 +1,102 @@
+common:
+  seed: 42
+  gpu_devices: 6
+  gpu: 0,1,3,4,5,6
+  dist_url: tcp://127.0.0.1:32461
+  dist_backend: nccl
+  rank: 0
+  world_size: 1
+  distributed: true
+  save_dir: ./multi
+  n_epochs: 20
+
+optimizer:
+  name: adamw
+  weight_decay: 0.1
+  learning_rate: 1e-05
+  adam_betas: [0.9, 0.98]
+  adam_eps: 1e-06
+
+lr_scheduler:
+  name: linear_decay
+  warmup_ratie: 0.1
+  
+dataset:
+  task:
+    cola:
+      type: single-sentence-classification
+      enable_san: false
+      num_classes: 2
+      metric_type: 1
+      layer_type: 0
+      is_mse: false
+
+    sst2:
+      type: single-sentence-classification
+      enable_san: false
+      num_classes: 2
+      metric_type: 4
+      layer_type: 0
+      is_mse: false
+
+    mrpc:
+      type: pairwise-text-classification
+      enable_san: true
+      num_classes: 2
+      metric_type: 3
+      layer_type: 1
+      is_mse: false
+
+    stsb:
+      type: pairwise-text-similarity
+      enable_san: false
+      num_classes: 1
+      metric_type: 2
+      layer_type: 2
+      is_mse: true
+
+    qqp:
+      type: pairwise-text-classification
+      enable_san: true
+      num_classes: 2
+      metric_type: 3
+      layer_type: 1
+      is_mse: false
+
+    mnli:
+      type: pairwise-text-classification
+      sub-type: [matched, mismatched]
+      enable_san: true
+      num_classes: 3
+      metric_type: 4
+      layer_type: 1
+      is_mse: false
+
+    qnli:
+      type: pairwise-ranking
+      enable_san: false
+      num_classes: 2
+      metric_type: 4
+      layer_type: 3
+      is_mse: false
+
+    rte:
+      type: pairwise-text-classification
+      enable_san: true
+      num_classes: 2
+      metric_type: 4
+      layer_type: 1
+      is_mse: false
+
+    wnli:
+      type: pairwise-text-classification
+      enable_san: true
+      num_classes: 2
+      metric_type: 4
+      layer_type: 1
+      is_mse: false
+
+model:
+  name: roberta-base
+  hidden_size: 768
+  dropout: 0.1

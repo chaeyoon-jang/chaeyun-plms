@@ -122,6 +122,9 @@ celerybeat.pid
 # model checkpoints file
 *.pt
 
+# data loader file
+*.pth
+
 # Environments
 .env
 .venv

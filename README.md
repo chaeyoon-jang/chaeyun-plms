@@ -36,9 +36,9 @@ Use the `--DEBUG` flag if you want to debug your codes.
 * data  : `dev_set`
 * fine-tuning method : `single-task finetuning & full-fine tuning`
 
-| Method             | RTE    | MRPC   | COLA   | SST-2  | STS-B | MNLI | QQP   | QNLI
-| :-                 | :-:    | :-:    | :-:    | :-:    | :-:   | :-:  | :-:   | :-:
-| AdamW              | 82.22  | 93.32  | 62.27  | 94.77  | 76.52 |  -   | 88.25 |  -
-| + SWA (1 Budget)   | 80.90  | 93.15  | 62.04  | 95.45  | 76.54 |  -   | 88.13 |  -
-| + SWA (3 Budgets)  | 83.33  | 93.15  | 62.04  | 95.45  | 76.54 |  -   | 88.18 |  -
-| Ensemble (n=3)     | 83.33  | 93.17  | 63.04  | -      | -     |  -   |  -    |  -
+| Method             | RTE    | MRPC   | COLA   | SST-2  | STS-B | QNLI | QQP   | MNLI(M) | MNLI(MM)
+| :-                 | :-:    | :-:    | :-:    | :-:    | :-:   | :-:  | :-:   | :-:     | :-:
+| AdamW              | 82.22  | 93.32  | 62.27  | 94.77  | 76.52 |  -   | 88.25 |  -      | -
+| + SWA (1 Budget)   | 80.90  | 93.15  | 62.04  | 95.45  | 76.54 |  -   | 88.13 |  -      | -
+| + SWA (3 Budgets)  | 83.33  | 93.15  | 62.04  | 95.45  | 76.54 |  -   | 88.18 |  -      | -
+| Ensemble (n=3)     | 83.33  | 93.17  | 63.04  | -      | -     |  -   |  -    |  -      | -

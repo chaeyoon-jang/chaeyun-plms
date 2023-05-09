@@ -1,10 +1,13 @@
-import random
 import os
 import yaml
+import random
+import datetime
+
 import torch
 import numpy as np
 from torch.backends import cudnn
 from collections import OrderedDict
+from tabulate import tabulate
 
 def set_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
@@ -75,3 +78,35 @@ class chaeyun_average(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count 
+
+class chaeyun_logs(object):
+    def __init__(self):
+        self.train_loss = []
+        self.valid_loss = []
+        self.train_acc = []
+        self.valid_acc = []
+        self.train_time = []
+
+    def update(self, tl, vl, ta, va, tt):
+        self.train_loss.append(tl)
+        self.valid_loss.append(vl)
+        self.train_acc.append(ta)
+        self.valid_loss.append(va)
+        self.train_time.append(tt)
+
+    def summary(self):
+        my_headr = ['best_epoch','best_acc','average_time']
+        best_epoch = self.valid_acc.index(max(self.valid_acc)) + 1
+        total_time = datetime.timedelta(seconds=np.mean(self.train_time))
+        my_table = [[best_epoch, self.valid_acc[best_epoch], total_time]] 
+        print("===== Training Results =====")
+        print(tabulate(my_table, headers=my_headr, tablefmt='orgtbl'))
+
+    def result(self):
+        return {
+            'train_loss': self.train_loss,
+            'valid_loss': self.valid_loss,
+            'train_acc': self.train_acc,
+            'valid_acc': self.valid_acc,
+            'train_time': self.train_time
+        }

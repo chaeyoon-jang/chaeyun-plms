@@ -1,8 +1,10 @@
 import torch
 from torch import nn
-from .utils import convert_dict, chaeyun_average
 from typing import Optional, Tuple
 from transformers import AutoModel
+
+from .layers import MultiTaskClassifier
+from .utils import convert_dict, chaeyun_average
 
 class SingleTaskClassificationModel(nn.Module):
     def __init__(self, config):
@@ -16,7 +18,16 @@ class SingleTaskClassificationModel(nn.Module):
                 attention_mask: Optional[torch.FloatTensor] = None,
                 token_type_ids: Optional[torch.LongTensor] = None,
                 ):
-        
+        """_summary_
+
+        Args:
+            input_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
+            attention_mask (Optional[torch.FloatTensor], optional): _description_. Defaults to None.
+            token_type_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         outputs = self.model(input_ids, 
                              attention_mask=attention_mask,
                              token_type_ids=token_type_ids)
@@ -35,27 +46,47 @@ class SingleTaskClassificationModel(nn.Module):
             'attention': outputs.attentions,
         })
 
+# init : config 안에 hidden_size, dropout, enable_san
+# input : seq_outputs, premise_mask, hyp_mask, enable_san
+# output : logits
+
 class MultiTaskClassificationModel(nn.Module):
     def __init__(self, config):
         super(MultiTaskClassificationModel, self).__init__()
         self.model = AutoModel.from_pretrained(config.model.name, add_pooling_layer=False)
         self.task_specific_layers = nn.ModuleList()
-
+        
+        task_flag = list()
         for task_def in config.dataset.task.items():
-            num_classes = task_def.num_classes
-            task_type = task_def.type
-
-
-
-    
+            new_config = convert_dict({'hidden_size': config.model.hidden_size,
+                                       'dropout': config.model.dropout,
+                                       'enable_san': task_def.enable_san})
+            if task_def.layer_type not in task_flag:
+                out_proj = MultiTaskClassifier(config)
+                self.task_specific_layers.append(out_proj)
+                
     def forward(
             self, input_ids: Optional[torch.LongTensor] = None,
             attention_mask: Optional[torch.FloatTensor] = None,
             token_type_ids: Optional[torch.LongTensor] = None,
+            layer_type: int = None 
             ):
-        return None  
+        """_summary_
 
+        Args:
+            input_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
+            attention_mask (Optional[torch.FloatTensor], optional): _description_. Defaults to None.
+            token_type_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
 
+        Returns:
+            _type_: _description_
+        """
+        outputs = self.model(input_ids,
+                             attention_mask=attention_mask,
+                             token_type_ids=token_type_ids)
+        logits = self.task_specific_layers[layer_type](outputs.last_hidden_state)
+        
+        return convert_dict({'logits': logits})  
 
 class SingleTaskGenerationModel(nn.Module):
     def __init__(self, config):
@@ -68,7 +99,17 @@ class SingleTaskGenerationModel(nn.Module):
                 attention_mask: Optional[torch.FloatTensor] = None,
                 token_type_ids: Optional[torch.LongTensor] = None,
                 ):
-        
+        """_summary_
+
+        Args:
+            input_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
+            past_key_values (Optional[Tuple[Tuple[torch.Tensor]]], optional): _description_. Defaults to None.
+            attention_mask (Optional[torch.FloatTensor], optional): _description_. Defaults to None.
+            token_type_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
+
+        Returns:
+            _type_: _description_
+        """
         outputs = self.lm_model(input_ids, 
                              past_key_values=past_key_values,
                              attention_mask=attention_mask,
