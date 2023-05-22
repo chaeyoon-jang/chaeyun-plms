@@ -62,7 +62,7 @@ def train(
     ckpt_path = p.join(config.common.save_dir,\
                 f'./ckpt/{config.dataset.name}_{config.optimizer.learning_rate}_{config.common.seed}.pt')
     log_path = p.join(config.common.save_dir,\
-                f'./log/{config.dataset.name}_{config.common.learning_rate}_{config.common.seed}.json')
+                f'./log/{config.dataset.name}_{config.optimizer.learning_rate}_{config.common.seed}.json')
 
     train_loader, valid_loader = data_loader
     (optimizer, lr_scheduler), _ = optimizers
@@ -219,86 +219,131 @@ def train_swa(
 def train_multi(
         model, criterion, metric, optimizers, data_loader, config):
     
-    tasks = config.dataset.task #TODO: attributes names만 뽑아오기
-    optimizer = config.optimizer
+    tasks = config.dataset.task 
+    optimizer_ = config.optimizer
     common = config.common
     
     device = 'cuda' if common.gpu > 0 else 'cpu'
     ckpt_path = p.join(common.save_dir,\
-                f'./ckpt/multitask_{optimizer.learning_rate}_{common.seed}.pt')
+                f'./ckpt/multitask_{common.learning_rate}_{common.seed}.pt')
     log_path = p.join(common.save_dir,\
                 f'./log/multitask_{common.learning_rate}_{common.seed}.json')
 
     train_loader, valid_loader = data_loader
+    task_names =  list(valid_loader.keys())
     optimizer, lr_scheduler = optimizers
 
     best_acc = 0.0
-    best_metric = 0.0
-    logs = chaeyun_logs()
+    
+    logs = dict()
+    for name in range(len(task_names)):
+        logs[name] = chaeyun_logs()
 
     for epoch in range(common.n_epochs):
-
-        train_loss = chaeyun_average()
-        train_acc = chaeyun_average()
+        
+        train_loss = dict()
+        train_acc = dict()
+        for name in task_names:
+            train_loss[name] = chaeyun_average()
+            train_acc[name] = chaeyun_average()
 
         model.train()
         epoch_start = time.time()
         total = len(train_loader)
-
+        
         with tqdm(total=total) as pbar:
-            for batch_idx, data in enumerate(train_loader):
+            # train_features, train_labels = next(iter(train_dataloader))
+            # for _ in range(total):
+            for data in train_loader:
+                #data = next(iter(train_loader))
                 start = time.time()
 
                 input_ids = data['input_ids'].cuda(common.gpu)
                 attention_mask = data['attention_mask'].cuda(common.gpu)
-                token_type_ids = data['token_type_ids'].cuda(common.gpu)
+                premise_mask = data['premise_mask'].cuda(common.gpu)
+                hyp_mask = data['hyp_mask'].cuda(common.gpu)
                 targets = data['label'].to(torch.int64).cuda(common.gpu)
-                task = eval(f'tasks.{data["name"]}')
+                task_name = data['task_name'][0]
+                task = eval(f'tasks.{task_name}') 
                 
                 outputs = model(input_ids=input_ids, 
                                 attention_mask=attention_mask,
-                                token_type_ids=token_type_ids,
-                                task_type=task.layer_num)
+                                premise_mask=premise_mask,
+                                hyp_mask = hyp_mask,
+                                layer_type=task.layer_type,
+                                enable_san=task.enable_san)
                 
                 with torch.autocast('cuda'):
-                    loss = criterion(outputs, targets, task.is_mse)
-                    acc, _ = metric.calculate(outputs, targets, task.metric_type)
+                    if task.is_mse:
+                        loss = criterion[0](outputs.logits, targets)
+                    else:
+                        loss = criterion[1](outputs.logits, targets)
+                    acc, _ = metric.calculate(outputs.logits, targets, task.metric_type)
 
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
 
-                if optimizer.name != 'sgd':
+                if optimizer_.name != 'sgd':
                     lr_scheduler.step()
 
-                train_loss.update(loss.item())
-                train_acc.update(acc)
+                train_loss[task_name].update(loss.item())
+                train_acc[task_name].update(acc)
                 pbar.update(1)
-
-        epoch_train_loss = train_loss.avg
-        epoch_train_acc = train_acc.avg
+        
+        total_train_result = dict()
+        for name in task_names:
+            # epoch_train_loss, epoch_train_acc
+            total_train_result[name] = [train_loss[name].avg, train_acc[name].avg]
 
         elapse_time = time.time() - epoch_start
+        total_valid_result = dict()
         
-        model.eval()
-        with torch.no_grad():
-            valid_loss = 0.0
-            valid_acc = 0.0
-            valid_metric = 0.0
-            #for task_name in task_names:
+        avg_train_acc  = 0.0
+        avg_valid_acc  = 0.0
+        
+        for name in task_names:
+            # epoch_valid_loss, epoch_valid_acc, epoch_valid_metric
+            total_valid_result[name] = validate(model, criterion, metric, valid_loader[name], name, device)
             
-        #epoch_valid_loss, epoch_valid_acc, epoch_valid_add =  
-        logs.update(epoch_train_loss, epoch_valid_loss,
-                    epoch_train_acc, epoch_valid_acc,
-                    elapse_time)
-                                                                                                                                     
-        elapse_time = datetime.timedelta(seconds=elapse_time)
-        print(f"Epoch: {epoch+1} | train loss: {epoch_train_loss:.4f} | train acc: {epoch_train_acc:.4f}% | time: {elapse_time}")
-        print(f"Epoch: {epoch+1} | valid loss: {epoch_valid_loss:.4f} | valid acc: {epoch_valid_acc:.4f}% | metric: {epoch_valid_add:.4f}%")
+            total_train_loss = total_train_result[name][0] 
+            total_train_acc  = total_valid_result[name][0]
+            total_valid_loss = total_train_result[name][1]
+            total_valid_acc  = total_valid_result[name][1]
+            total_valid_metric = total_valid_result[name][2]
+            
+            avg_train_acc  += total_train_acc
+            avg_valid_acc  += total_valid_acc       
+             
+            logs[name].update(total_train_loss,
+                              total_train_acc,
+                              total_valid_loss,
+                              total_valid_acc, 
+                              elapse_time
+                              )
+            
+            elapse_time = datetime.timedelta(seconds=elapse_time)
+            print(f"================== {name} Data Results ==================")
+            print(f"Epoch: {epoch+1} | train loss: {total_train_loss:.4f} | train acc: {total_train_acc:.4f}% | time: {elapse_time}")
+            print(f"Epoch: {epoch+1} | valid loss: {total_valid_loss:.4f} | valid acc: {total_valid_acc:.4f}% | metric: {total_valid_metric:.4f}%")
+            print(f"---------------------------------------------------------")
         
-        if epoch_valid_acc > best_acc:
-            best_acc = epoch_valid_acc
+        avg_train_acc  /= len(task_names)
+        avg_valid_acc  /= len(task_names)
+        
+        print(f"================== {name} Data Results ==================")
+        print(f"Epoch: {epoch+1} | train acc: {avg_train_acc:.4f} | valid acc: {avg_valid_acc:.4f}%")
+        print(f"---------------------------------------------------------")
+                                                                                                                    
+        if avg_valid_acc > best_acc:
+            best_acc = avg_valid_acc
             save_model(model, epoch, best_acc, ckpt_path)
     
-    logs.summary()
-    save_log(logs.result(), log_path)
+    total_logs = dict()
+    for name in task_names:
+        print(f"================== {name} Data Summary ==================")
+        logs[name].summary()
+        print(f"---------------------------------------------------------")
+        total_logs[name] = logs[name].result()
+    
+    save_log(total_logs, log_path)

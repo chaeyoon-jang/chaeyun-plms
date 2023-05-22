@@ -18,16 +18,7 @@ class SingleTaskClassificationModel(nn.Module):
                 attention_mask: Optional[torch.FloatTensor] = None,
                 token_type_ids: Optional[torch.LongTensor] = None,
                 ):
-        """_summary_
 
-        Args:
-            input_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
-            attention_mask (Optional[torch.FloatTensor], optional): _description_. Defaults to None.
-            token_type_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
         outputs = self.model(input_ids, 
                              attention_mask=attention_mask,
                              token_type_ids=token_type_ids)
@@ -46,10 +37,6 @@ class SingleTaskClassificationModel(nn.Module):
             'attention': outputs.attentions,
         })
 
-# init : config 안에 hidden_size, dropout, enable_san
-# input : seq_outputs, premise_mask, hyp_mask, enable_san
-# output : logits
-
 class MultiTaskClassificationModel(nn.Module):
     def __init__(self, config):
         super(MultiTaskClassificationModel, self).__init__()
@@ -57,34 +44,29 @@ class MultiTaskClassificationModel(nn.Module):
         self.task_specific_layers = nn.ModuleList()
         
         task_flag = list()
-        for task_def in config.dataset.task.items():
+        temp_dict = config.dataset.task.__dict__['_temp_dict']
+        for _, task_def in temp_dict.items():
             new_config = convert_dict({'hidden_size': config.model.hidden_size,
                                        'dropout': config.model.dropout,
-                                       'enable_san': task_def.enable_san})
-            if task_def.layer_type not in task_flag:
-                out_proj = MultiTaskClassifier(config)
+                                       'max_seq_length': config.dataset.max_seq_length,
+                                       'num_classes': task_def['num_classes'],
+                                       'enable_san': task_def['enable_san']})
+            if task_def['layer_type'] not in task_flag:
+                out_proj = MultiTaskClassifier(new_config)
                 self.task_specific_layers.append(out_proj)
                 
     def forward(
             self, input_ids: Optional[torch.LongTensor] = None,
             attention_mask: Optional[torch.FloatTensor] = None,
-            token_type_ids: Optional[torch.LongTensor] = None,
-            layer_type: int = None 
+            premise_mask: Optional[torch.FloatTensor] = None,
+            hyp_mask: Optional[torch.FloatTensor] = None,
+            layer_type: int = None,
+            enable_san: bool = None,
             ):
-        """_summary_
-
-        Args:
-            input_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
-            attention_mask (Optional[torch.FloatTensor], optional): _description_. Defaults to None.
-            token_type_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
+        
         outputs = self.model(input_ids,
-                             attention_mask=attention_mask,
-                             token_type_ids=token_type_ids)
-        logits = self.task_specific_layers[layer_type](outputs.last_hidden_state)
+                             attention_mask=attention_mask)
+        logits = self.task_specific_layers[layer_type](outputs.last_hidden_state, attention_mask, enable_san)
         
         return convert_dict({'logits': logits})  
 
@@ -99,17 +81,7 @@ class SingleTaskGenerationModel(nn.Module):
                 attention_mask: Optional[torch.FloatTensor] = None,
                 token_type_ids: Optional[torch.LongTensor] = None,
                 ):
-        """_summary_
-
-        Args:
-            input_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
-            past_key_values (Optional[Tuple[Tuple[torch.Tensor]]], optional): _description_. Defaults to None.
-            attention_mask (Optional[torch.FloatTensor], optional): _description_. Defaults to None.
-            token_type_ids (Optional[torch.LongTensor], optional): _description_. Defaults to None.
-
-        Returns:
-            _type_: _description_
-        """
+        
         outputs = self.lm_model(input_ids, 
                              past_key_values=past_key_values,
                              attention_mask=attention_mask,

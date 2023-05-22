@@ -9,19 +9,28 @@ common:
   distributed: true
   save_dir: ./multi
   n_epochs: 20
+  learning_rate: 2e-05
 
 optimizer:
   name: adamw
   weight_decay: 0.1
-  learning_rate: 1e-05
+  learning_rate: 2e-05
   adam_betas: [0.9, 0.98]
   adam_eps: 1e-06
 
 lr_scheduler:
   name: linear_decay
-  warmup_ratie: 0.1
+  warmup_ratio: 0.1
   
 dataset:
+  name: multi-task
+  type: classification
+  batch_size: 32
+  num_workers: 0
+  max_seq_length: 512
+  pad_to_max_length: true
+  save_dir: ./glue-multi
+
   task:
     cola:
       type: single-sentence-classification

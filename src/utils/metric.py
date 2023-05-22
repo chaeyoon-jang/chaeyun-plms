@@ -57,10 +57,10 @@ class multi_glue_metrics:
     
     def calculate(self, logits, targets, metric_type):
         if metric_type == 1:
-            return self.type1(logits, targets)
+            return self.type1.calculate(logits, targets)
         elif metric_type == 2:
-            return self.type2(logits, targets)
+            return self.type2.calculate(logits, targets)
         elif metric_type == 3:
-            return self.type3(logits, targets)
+            return self.type3.calculate(logits, targets)
         else:
-            return self.type4(logits, targets)
+            return self.type4.calculate(logits, targets)
