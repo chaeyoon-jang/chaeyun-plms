@@ -18,7 +18,7 @@ dataset:
   batch_size: 16
   max_seq_length: 600
   pad_to_max_length: true
-  save_dir: ./glue-v2
+  save_dir: ./glue_benchmark
 
 optimizer:
   name: adamw

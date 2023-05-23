@@ -47,20 +47,3 @@ class glue_metrics:
             metric = result
 
         return result, metric
-
-class multi_glue_metrics:
-    def __init__(self):
-        self.type1 = glue_metrics('cola')
-        self.type2 = glue_metrics('stsb')
-        self.type3 = glue_metrics('mrpc')
-        self.type4 = glue_metrics('sst2')
-    
-    def calculate(self, logits, targets, metric_type):
-        if metric_type == 1:
-            return self.type1.calculate(logits, targets)
-        elif metric_type == 2:
-            return self.type2.calculate(logits, targets)
-        elif metric_type == 3:
-            return self.type3.calculate(logits, targets)
-        else:
-            return self.type4.calculate(logits, targets)

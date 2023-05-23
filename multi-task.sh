@@ -1,1 +1,0 @@
-python -m src.main --data-type glue --task-type multi-task --NO-DEBUG

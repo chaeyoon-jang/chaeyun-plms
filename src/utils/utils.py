@@ -2,6 +2,7 @@ import os
 import yaml
 import random
 import datetime
+from multiprocessing import cpu_count 
 
 import torch
 import numpy as np
@@ -31,6 +32,15 @@ def configure_cudnn(debug):
     if debug:
         cudnn.deterministic = True
         cudnn.benchmark = False
+
+def get_num_workers():
+    if cpu_count() > 5:
+        num_workers = cpu_count() // 2
+    elif cpu_count() < 2:
+        num_workers = 0
+    else:
+        num_workers = 2
+    return num_workers
 
 class convert_dict:
     def __init__(self, temp_dict):
@@ -91,14 +101,14 @@ class chaeyun_logs(object):
         self.train_loss.append(tl)
         self.valid_loss.append(vl)
         self.train_acc.append(ta)
-        self.valid_loss.append(va)
+        self.valid_acc.append(va)
         self.train_time.append(tt)
 
     def summary(self):
         my_headr = ['best_epoch','best_acc','average_time']
-        best_epoch = self.valid_acc.index(max(self.valid_acc)) + 1
+        best_epoch = self.valid_acc.index(max(self.valid_acc))
         total_time = datetime.timedelta(seconds=np.mean(self.train_time))
-        my_table = [[best_epoch, self.valid_acc[best_epoch], total_time]] 
+        my_table = [[best_epoch + 1, self.valid_acc[best_epoch], total_time]] 
         print("===== Training Results =====")
         print(tabulate(my_table, headers=my_headr, tablefmt='orgtbl'))
 

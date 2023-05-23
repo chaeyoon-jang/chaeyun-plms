@@ -1,7 +1,12 @@
-# Pretrained Language Models (PLMs) Baseline
+# Pretrained Language Models (PLMs) Baselines
 This repository contains the code for fine-tuning any PLMs provided by HuggingFace on Benchmark tasks.
 
 <b>Note:</b> the baselines provided in this repository aim to contribute to the research on generalization by exploring the loss surfaces of PLMs. Accordingly, [stochastic weight averaging (SWA)](https://arxiv.org/abs/1803.05407) and [sharpness aware minimization (SAM)](https://arxiv.org/abs/2010.01412) are also provided as optimization methods.
+
+<b>To Do:</b>
+* Add SAM optimizer. 
+* Add Squad 2.0 dataset.
+* Add Super-GLUE dataset.
 
 # Dependencies
 * [PyTorch](http://pytorch.org/)

@@ -19,7 +19,7 @@ dataset:
   batch_size: 32
   max_seq_length: 600
   pad_to_max_length: true
-  save_dir: ./glue-v2
+  save_dir: ./glue_benchmark
   
 optimizer:
   name: adamw
@@ -30,7 +30,7 @@ optimizer:
 
 lr_scheduler:
   name: linear_decay
-  warmup_ratie: 0.1
+  warmup_ratio: 0.1
 
 model:
   name: roberta-base
