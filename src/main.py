@@ -91,7 +91,6 @@ def main_worker(gpu, n_gpus_per_node, config, args):
     print("The number of parameters of model is {}...".format(num_params))
 
     print("Preparing data...")
-
     tokenizer = AutoTokenizer.from_pretrained(config.model.name)
     
     if args.data_name == 'glue':

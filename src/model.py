@@ -64,7 +64,6 @@ class TextGenerationModel(nn.Module):
 
 def build_model(config) -> nn.Module:
     name = config.model.name
-    
     if 'roberta' in name:
         model = SequenceClassificationModel(config)
     
@@ -76,7 +75,5 @@ def build_model(config) -> nn.Module:
         model = TextGenerationModel(config)
     
     else:
-        raise NotImplementedError(
-            f'Unknown config.model.name = \"{name}\"'
-        )
+        raise NotImplementedError(f'Unknown config.model.name = \"{name}\"')
     return model
