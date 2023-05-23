@@ -84,8 +84,7 @@ def main_worker(gpu, n_gpus_per_node, config, args):
     config.dataset.batch_size = int(config.dataset.batch_size / n_gpus_per_node)
     config.dataset.num_worker = int(config.dataset.num_workers / n_gpus_per_node)
 
-    model = torch.nn.parallel.DistributedDataParallel(model, 
-                                                      device_ids=[config.common.gpu])
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[config.common.gpu])
     num_params = sum(params.numel() for params in model.parameters() if params.requires_grad)
 
     print("The number of parameters of model is {}...".format(num_params))
@@ -100,22 +99,21 @@ def main_worker(gpu, n_gpus_per_node, config, args):
             flag = args.task_name.replace('mnli', '')
             args.task_name = 'mnli'   
             
-        train_data_path = p.join(config.dataset.save_dir,f'{args.task_name}_train.pth')
-        valid_data_path = p.join(config.dataset.save_dir,f'{args.task_name}_validation{flag}.pth')
+        train_data_path = p.join(config.dataset.save_dir, f'{args.task_name}_train.pth')
+        valid_data_path = p.join(config.dataset.save_dir, f'{args.task_name}_validation{flag}.pth')
 
         if not p.isfile(train_data_path):
             os.makedirs(config.dataset.save_dir, exist_ok=True)
             make_glue_dataframe(args.task_name, tokenizer, config.dataset)
         
-    train_ds, valid_ds = (torch.load(train_data_path), torch.load(valid_data_path))
-    train_ds, valid_ds = GLUEDataset(train_ds), GLUEDataset(valid_ds)
+        train_ds, valid_ds = (torch.load(train_data_path), torch.load(valid_data_path))
+        train_ds, valid_ds = GLUEDataset(train_ds), GLUEDataset(valid_ds)
     
-    print("Load dataloaders...")
-    train_loader = load_glue_data_loader(train_ds, batch_size=config.dataset.batch_size, shuffle=True)
-    valid_loader = load_glue_data_loader(valid_ds, batch_size=config.dataset.batch_size, shuffle=False)
+        train_loader = load_glue_data_loader(train_ds, batch_size=config.dataset.batch_size, shuffle=True)
+        valid_loader = load_glue_data_loader(valid_ds, batch_size=config.dataset.batch_size, shuffle=False)
     
-    metric = glue_metrics(config.dataset.name)
-    criterion = chaeyun_criterion(config.dataset.type)
+        metric = glue_metrics(config.dataset.name)
+        criterion = chaeyun_criterion(config.dataset.type)
                 
     print("Start training...")
     os.makedirs(p.join(config.common.save_dir,'./ckpt'), exist_ok=True)
